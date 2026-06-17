@@ -30,17 +30,15 @@
 
         .calendar-day {
             aspect-ratio: 1 / 1;
-            min-width: 0;
-            min-height: 0;
+            min-height: 40px;
             transition: all 0.2s;
             position: relative;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            overflow: hidden;
-            border-radius: 18px !important;
         }
 
+        /* Tablet and up keeps the original sizing untouched */
         @media (min-width: 640px) {
             .calendar-day {
                 min-height: 60px;
@@ -535,6 +533,12 @@
         let globalLogs = [];
         let adminNotes = JSON.parse(localStorage.getItem('kktaz_admin_notes') || '{}');
 
+        // Paint the calendar immediately with default "Available" data so it is
+        // visible the instant the page loads, instead of staying blank until the
+        // Supabase data finishes loading (or until the user clicks a button).
+        renderCalendar();
+        renderAdminCalendar();
+
         const track = document.getElementById('sliderTrack');
         const slides = document.querySelectorAll('.admin-slide');
         let currentIdx = 0;
@@ -641,7 +645,7 @@
             const offset = (firstDay === 0 ? 6 : firstDay - 1);
             const daysCount = new Date(year, month + 1, 0).getDate();
             for (let i = 0; i < offset; i++) {
-                grid.appendChild(Object.assign(document.createElement('div'), { className: 'calendar-day empty-day p-1 sm:p-2 curved-box' }));
+                grid.appendChild(Object.assign(document.createElement('div'), { className: 'calendar-day empty-day p-2 curved-box' }));
             }
             for (let d = 1; d <= daysCount; d++) {
                 const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -658,11 +662,11 @@
                 else if (isSel) { statusCls = 'status-selected'; statusText = 'Selected'; }
                 else if (inRange) { statusCls = 'status-range'; statusText = 'Selected'; }
                 if (dateStr === todayStr) statusCls += ' is-today';
-                el.className = `calendar-day p-1 sm:p-2 lg:p-3 curved-box text-[8px] lg:text-xs font-black shadow-sm ${statusCls}`;
+                el.className = `calendar-day p-1 sm:p-2 lg:p-3 curved-box text-[7px] sm:text-[8px] lg:text-xs font-black shadow-sm ${statusCls}`;
                 el.innerHTML = `
                     <div class="flex justify-between items-start">
                         <span>${d}</span>
-                        ${dateStr === todayStr ? '<span class="text-[6px] text-orange-600 bg-orange-100 px-1 rounded">TODAY</span>' : ''}
+                        ${dateStr === todayStr ? '<span class="text-[6px] text-orange-600 bg-orange-100 px-0.5 sm:px-1 rounded">TODAY</span>' : ''}
                     </div>
                     <div class="flex flex-col">
                         <div class="text-[5px] lg:text-[7px] uppercase tracking-tighter font-black opacity-90 truncate">${statusText}</div>
@@ -706,36 +710,42 @@
         function changeMonth(s) { currentDate.setMonth(currentDate.getMonth() + s); renderCalendar(); renderAdminCalendar(); }
 
         async function loadLogs() {
-            await fetchAdminNotes();
-            const { data, error } = await _supabase.from('bookings').select('*').order('start_date', { ascending: true });
-            if (!error && data) globalLogs = data;
-            const body = document.getElementById('logTableBody');
-            body.innerHTML = '';
-            document.getElementById('emptyMsg').style.display = globalLogs.length ? 'none' : 'block';
-            globalLogs.forEach(l => {
-                const rowHTML = `
-                    <tr class="border-b hover:bg-slate-50 transition">
-                        <td class="p-4 font-black text-purple-900 uppercase">${l.student_name}</td>
-                        <td class="p-4 font-mono text-gray-500">${l.matric_no}</td>
-                        <td class="p-4 font-bold text-orange-600 text-[10px]">${l.contact_no}</td>
-                        <td class="p-4 text-gray-500 font-bold text-[10px] uppercase">${l.jkp_jtkd || 'N/A'}</td>
-                        <td class="p-4 italic text-gray-400 max-w-xs">
-                            <div class="font-bold truncate">${l.project_details}</div>
-                            <div class="text-[9px] text-gray-400 line-clamp-1">Reason: ${l.borrow_reason || 'N/A'}</div>
-                        </td>
-                        <td class="p-4 text-center font-black text-gray-700">
-                             <div>${l.start_date} (${l.pickup_time || '--:--'})</div>
-                             <div class="text-[9px] text-gray-400 uppercase tracking-tighter">— to —</div>
-                             <div>${l.end_date} (${l.return_time || '--:--'})</div>
-                        </td>
-                        <td class="p-4 text-center">
-                            <button onclick="cancelB('${l.id}')" class="bg-red-50 text-red-500 p-2 rounded-lg font-black uppercase text-[8px] hover:bg-red-500 hover:text-white transition">Remove</button>
-                        </td>
-                    </tr>`;
-                body.insertAdjacentHTML('beforeend', rowHTML);
-            });
-            renderCalendar();
-            renderAdminCalendar();
+            try {
+                await fetchAdminNotes();
+                const { data, error } = await _supabase.from('bookings').select('*').order('start_date', { ascending: true });
+                if (error) throw error;
+                globalLogs = data;
+                const body = document.getElementById('logTableBody');
+                body.innerHTML = '';
+                document.getElementById('emptyMsg').style.display = globalLogs.length ? 'none' : 'block';
+                globalLogs.forEach(l => {
+                    const rowHTML = `
+                        <tr class="border-b hover:bg-slate-50 transition">
+                            <td class="p-4 font-black text-purple-900 uppercase">${l.student_name}</td>
+                            <td class="p-4 font-mono text-gray-500">${l.matric_no}</td>
+                            <td class="p-4 font-bold text-orange-600 text-[10px]">${l.contact_no}</td>
+                            <td class="p-4 text-gray-500 font-bold text-[10px] uppercase">${l.jkp_jtkd || 'N/A'}</td>
+                            <td class="p-4 italic text-gray-400 max-w-xs">
+                                <div class="font-bold truncate">${l.project_details}</div>
+                                <div class="text-[9px] text-gray-400 line-clamp-1">Reason: ${l.borrow_reason || 'N/A'}</div>
+                            </td>
+                            <td class="p-4 text-center font-black text-gray-700">
+                                 <div>${l.start_date} (${l.pickup_time || '--:--'})</div>
+                                 <div class="text-[9px] text-gray-400 uppercase tracking-tighter">— to —</div>
+                                 <div>${l.end_date} (${l.return_time || '--:--'})</div>
+                            </td>
+                            <td class="p-4 text-center">
+                                <button onclick="cancelB('${l.id}')" class="bg-red-50 text-red-500 p-2 rounded-lg font-black uppercase text-[8px] hover:bg-red-500 hover:text-white transition">Remove</button>
+                            </td>
+                        </tr>`;
+                    body.insertAdjacentHTML('beforeend', rowHTML);
+                });
+            } catch (err) {
+                console.error('loadLogs failed:', err);
+            } finally {
+                renderCalendar();
+                renderAdminCalendar();
+            }
         }
 
         async function cancelB(id) {
@@ -802,7 +812,7 @@
             }
         }
 
-        window.onload = () => { renderCalendar(); renderAdminCalendar(); loadLogs(); };
+        window.onload = () => { loadLogs(); };
     </script>
 </body>
 
